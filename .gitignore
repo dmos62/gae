@@ -1,0 +1,6 @@
+.buffers.vim
+*.swp
+*.swo
+/target
+.polyglot.pom.yml
+/.vagrant
