@@ -4,11 +4,14 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dmos</groupId>
   <artifactId>gae</artifactId>
-  <version>1.0</version>
+  <version>1.01</version>
   <packaging>jar</packaging>
   <prerequisites>
     <maven>3.3.0</maven>
   </prerequisites>
+  <properties>
+    <appengine.version>1.9.30</appengine.version>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>com.google.appengine</groupId>

@@ -75,6 +75,7 @@ object Datastore {
   type Key = ds.Key
   type Entity = ds.Entity
   type Query = ds.Query
+  type Text = ds.Text
   
   object Query {
     def apply(kind:Kindas):Query = new Query(kind.name)
