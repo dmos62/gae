@@ -1,20 +1,19 @@
 package dmos.gae
 
-import com.google.appengine.{api => aeapi}
+import scala.language.implicitConversions
 
-case class Kindas(name:String) extends AnyVal
+import com.google.appengine.{api => aeapi}
+import Datastore.{Entity, Key, Kind}
+import Blobstore.BlobKey
 
 trait Objektas {
-  import Datastore.{Entity, Key}
-  import Blobstore.BlobKey
-  val kind:Kindas
+  val kind:Kind
   val key:Key
   def blobs:Set[BlobKey]
 }
 
 trait JuodasObjektas[O <: Objektas] {
-  import Datastore.Key
-  val kind:Kindas
+  val kind:Kind
   def key:Key
   def issaugotas:O
   def svarus:O
@@ -28,29 +27,24 @@ trait Juodinamas[J] {
 /* Entity to/from converteriai */
 
 trait ObjektasFrom[O <: Objektas] {
-  import Datastore.Entity
   def objektasFrom(e: Entity): O
 }
 
 object ObjektasFrom {
-  import Datastore.Entity
   def apply[O <: Objektas](vertejas: Entity => O) =
     new ObjektasFrom[O] { def objektasFrom(e: Entity) = vertejas(e) }
 }
 
 trait EntityFrom[O <: Objektas] {
-  import Datastore.Entity
   def entityFrom(o: O): Entity
 }
 
 object EntityFrom {
-  import Datastore.Entity
   def apply[O <: Objektas](vertejas: O => Entity) =
     new EntityFrom[O] { def entityFrom(o: O) = vertejas(o) }
 }
 
 trait EntityToFrom[O <: Objektas] {
-  import Datastore.Entity
   def objektasFrom(e:Entity):O
   def entityFrom(o:O):Entity
 }
@@ -60,7 +54,6 @@ object EntityToFrom {
     implicit objFrom:ObjektasFrom[O], entFrom:EntityFrom[O]
   ):EntityToFrom[O] =
     new EntityToFrom[O] {
-      import Datastore.Entity
       def objektasFrom(e:Entity) = objFrom.objektasFrom(e)
       def entityFrom(o:O) = entFrom.entityFrom(o)
   }
@@ -72,13 +65,43 @@ object Datastore {
   import aeapi.{datastore => ds}
   import scala.collection.JavaConverters._
 
+  case class Kind(name:String) extends AnyVal
+
   type Key = ds.Key
-  type Entity = ds.Entity
+  //type Entity = ds.Entity
   type Query = ds.Query
-  type Text = ds.Text
+
+  trait Entity { 
+    val under:ds.Entity
+
+    private type Text = ds.Text
+
+    private implicit def symbol2string(s:Symbol) = s.name
+
+    def set[T](name:Symbol, value:T):Entity =
+      { under.setProperty(name, value); this }
+
+    def setUnindexedString(name:Symbol, value:String):Entity =
+      set(name, new Text(value))
+
+    def get[T](name:Symbol):T = under.getProperty(name).asInstanceOf[T]
+
+    def getUnindexedString(name:Symbol):String = get[Text](name).getValue
+
+    def optionGet[T](name:Symbol):Option[T] =
+      if (under.hasProperty(name)) Some(get[T](name)) else None
+  }
+
+  object Entity {
+    def apply(key:Key):Entity = Entity(new ds.Entity(key))
+
+    def apply(ent:ds.Entity):Entity = new Entity {
+      val under = ent
+    }
+  }
   
   object Query {
-    def apply(kind:Kindas):Query = new Query(kind.name)
+    def apply(kind:Kind):Query = new Query(kind.name)
   }
 
   object Filter {
@@ -96,6 +119,10 @@ object Datastore {
       .asList(defaultFetchOptions)
       .asScala.toList
    */
+
+  private implicit def entityDewrap(ent:Entity):ds.Entity = ent.under
+
+  private implicit def entityWrap(ent:ds.Entity):Entity = Entity(ent)
 
   def gaukDaug[O <: Objektas]
   (q:Query)(implicit conv:ObjektasFrom[O]):List[O] =
@@ -115,17 +142,17 @@ object Datastore {
     conv.objektasFrom(datastore.get(key))
 
   def gauk[O <: Objektas]
-  (kind:Kindas, id:Long)(implicit conv:ObjektasFrom[O]):O =
+  (kind:Kind, id:Long)(implicit conv:ObjektasFrom[O]):O =
     gauk[O](idToKey(kind, id))
 
   def trink(key:Key) = datastore.delete(key)
 
-  def naujasKey(kind:Kindas) = datastore.allocateIds(kind.name, 1).getStart
+  def naujasKey(kind:Kind) = datastore.allocateIds(kind.name, 1).getStart
 
-  def idToKey(kind:Kindas, id:Long):Key =
+  def idToKey(kind:Kind, id:Long):Key =
     ds.KeyFactory.createKey(kind.name, id)
 
-  def nameToKey(kind:Kindas, name:String):Key =
+  def nameToKey(kind:Kind, name:String):Key =
     ds.KeyFactory.createKey(kind.name, name)
 }
 
@@ -158,15 +185,4 @@ object Images {
   def url(blobKey:BlobKey):String =
     imagesService.getServingUrl(
       ServingUrlOptions.Builder.withBlobKey(blobKey).secureUrl(true))
-}
-
-object RichEntity {
-  import Datastore.Entity
-
-  implicit class RichEntity(val e:Entity) extends AnyVal {
-    def get[T](name:String):T = e.getProperty(name).asInstanceOf[T]
-
-    def optionGet[T](name:String):Option[T] =
-      if (e.hasProperty(name)) Some(e.get[T](name)) else None
-  }
 }

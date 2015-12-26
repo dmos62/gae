@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dmos</groupId>
   <artifactId>gae</artifactId>
-  <version>1.01</version>
+  <version>1.1</version>
   <packaging>jar</packaging>
   <prerequisites>
     <maven>3.3.0</maven>
